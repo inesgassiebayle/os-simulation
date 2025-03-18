@@ -17,6 +17,23 @@ class Casino:
         with self.players_lock:
             self.players.append(player)
 
+    def open_casino(self):
+        games = ([Roulette(self, i) for i in range(5)]
+                 + [SlotMachine(self, i) for i in range(10)]
+                 + [BlackJack(self, i) for i in range(2)]
+                 + [Craps(self, i) for i in range(7)]
+                 + [Poker(self, i) for i in range(10)])
+        players = [Player(i, casino, balance=random.randint(50, 200)) for i in range(15)]
+
+        for player in players:
+            casino.add_player(player)
+
+        for game in games:
+            game.start()
+
+        for player in players:
+            player.start()
+
 
 class Player(threading.Thread):
     def __init__(self, id, casino, balance):
@@ -151,18 +168,7 @@ class Poker(Game):
         super().__init__(casino, "Poker", "♠️", random.randint(2, 10), 0.5, 2, id)
 
 
-
 casino = Casino()
+casino.open_casino()
 
-games = [Roulette(casino, i) for i in range(5)] + [SlotMachine(casino, i) for i in range(10)] + [BlackJack(casino, i) for i in range(2)]
 
-players = [Player(i, casino, balance=random.randint(50, 200)) for i in range(5)]
-
-for player in players:
-    casino.add_player(player)
-
-for game in games:
-    game.start()
-
-for player in players:
-    player.start()
