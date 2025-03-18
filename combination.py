@@ -10,6 +10,7 @@ class Player(threading.Thread):
         self.balance = balance
         self.casino = casino
         self.lock = threading.Lock()
+        self.current_game = None
 
     def place_bet(self, amount, game_name):
         """Player places a bet, deducting from wallet."""
@@ -27,185 +28,139 @@ class Player(threading.Thread):
             self.balance += amount
             print(f"🎉 {self.name} won ${amount} on {game_name}! New balance: ${self.balance}")
 
+
+    def play(self, game_name, game_logo, bet_amount, winning_probability, gain):
+        print(f"{game_logo} {self.name} is playing on a {game_name}!")
+        time.sleep(random.uniform(2, 5))  # Simulating waiting & playing time
+        if not self.place_bet(bet_amount, game_name):
+            return
+        time.sleep(2)
+        if random.random() < winning_probability:
+            self.add_winnings(bet_amount * gain, self.name)
+        else:
+            print(f"😢 {self.name} lost ${bet_amount} in {game_name}.")
+        self.current_game = None
+
+
     def run(self):
         """Simulates continuous play until the player runs out of money or decides to leave."""
-        while self.balance > 0:
+        while True:
+            # Player is already inside a game
+            while self.current_game:
+                time.sleep(2)
+                continue
+
+            # Cases in which the player decides to leave: out of money, cheating or own decision.
+            if self.balance <= 0:
+                print(f"🚪 {self.name} is out of money and leaves the casino.")
+                break
+
             if random.random() < 0.20:  # 20% chance to leave
                 print(f"🚪 {self.name} has decided to leave the casino with ${self.balance}.")
                 break
 
             if random.random() < 0.10:  # 10% chance to leave strategically
-                print(f"🃏 {self.name} is leaving the casino after strategizing.")
+                print(f"🚪 {self.name} is leaving the casino after strategizing.")
                 break
 
-            game_name = random.choice(list(self.casino.games.keys()))
+            # Random selection of the game
+            self.current_game = random.choice(list(self.casino.games.keys()))
             bet_amount = random.randint(5, self.balance)
 
-            self.casino.play_game(self, game_name, bet_amount)
-
-            if self.balance <= 0:
-                print(f"💸 {self.name} is out of money and leaves the casino.")
-                break
+            self.casino.play_game(self, self.current_game, bet_amount)
 
             time.sleep(random.uniform(0.5, 2))
 
-class CasinoGame:
+
+class CasinoGame(threading.Thread):
     """Base class for a casino game."""
-    def __init__(self, name):
+    def __init__(self, name, capacity):
+        super().__init__()
         self.name = name
+        self.capacity = capacity
 
     def play(self, player, bet_amount):
         raise NotImplementedError
 
-class Blackjack(CasinoGame):
-    """Simulates a Blackjack table with a capacity of 4 players."""
-    def __init__(self):
-        super().__init__("Blackjack")
-        self.table_lock = threading.Semaphore(50)  # Limits to 5 players and 10 tables
+class Blackjack(threading.Thread):
+    """Simulates a continuously running Blackjack table with a capacity of 4 players."""
 
-    def play(self, player, bet_amount):
-        print(f"🃏 {player.name} is waiting for a Blackjack table...")
+    def __init__(self, max_wait_time=10):
+        super().__init__()
+        self.name = "Blackjack"
+        self.capacity = 5  # Maximum players
+        self.table_lock = threading.Lock()
+        self.winning_probability = 0.42
+        self.logo = "🃏"
+        self.gain = 2
+        self.players = {}
+        self.waiting_lock = threading.Lock()
+        self.waiting = {}
+        self.max_wait_time = max_wait_time
+
+    def add_player(self, player, bet_amount):
+        """Adds a player to the game and signals the thread to check if it can start."""
         with self.table_lock:
-            print(f"🃏 {player.name} got a seat at the Blackjack table!")
-            time.sleep(random.uniform(2, 5))  # Simulating waiting & playing time
-            if not player.place_bet(bet_amount, self.name):
+            if len(self.players) < self.capacity:
+                self.players[player] = bet_amount
+                print(f"🃏 {player.name} has joined the Blackjack table with a bet of ${bet_amount}.")
                 return
-            time.sleep(2)  # Simulate game time
-            if random.random() < 0.42:
-                player.add_winnings(bet_amount * 2, self.name)
-            else:
-                print(f"😢 {player.name} lost ${bet_amount} in {self.name}.")
-
-class Roulette(CasinoGame):
-    """Simulates Roulette with 5 machines."""
-    def __init__(self):
-        super().__init__("Roulette")
-        self.machine_lock = threading.Semaphore(50)  # 30 machines available
-
-    def play(self, player, bet_amount):
-        print(f"🎡 {player.name} is waiting for a Roulette machine...")
-        with self.machine_lock:
-            print(f"🎡 {player.name} is playing Roulette!")
-            time.sleep(random.uniform(2, 5))  # Simulating waiting & playing time
-            if not player.place_bet(bet_amount, self.name):
-                return
-            time.sleep(2)
-            winning_color = random.choices(["Red", "Black", "Green"], weights=[18, 18, 1])[0]
-            chosen_color = random.choice(["Red", "Black"])
-            print(f"🎡 {player.name} bet on {chosen_color} in {self.name}, result was {winning_color}.")
-            if winning_color == chosen_color:
-                player.add_winnings(bet_amount * 2, self.name)
-            else:
-                print(f"😢 {player.name} lost ${bet_amount} in {self.name}.")
-
-class SlotMachine(CasinoGame):
-    """Simulates Slot Machines with 5 machines."""
-    def __init__(self):
-        super().__init__("Slot Machine")
-        self.machine_lock = threading.Semaphore(30)  # 20 machines available
-
-    def play(self, player, bet_amount):
-        print(f"🎰 {player.name} is waiting for a Slot Machine...")
-        with self.machine_lock:
-            print(f"🎰 {player.name} is playing on a Slot Machine!")
-            time.sleep(random.uniform(2, 5))  # Simulating waiting & playing time
-            if not player.place_bet(bet_amount, self.name):
-                return
-            time.sleep(2)
-            if random.random() < 0.12:
-                player.add_winnings(bet_amount * 10, self.name)
-            else:
-                print(f"😢 {player.name} lost ${bet_amount} in {self.name}.")
+        with self.waiting_lock:
 
 
-class Bingo(CasinoGame):
-    """Simulates a Bingo game with 100 spots available per round."""
-    def __init__(self):
-        super().__init__("Bingo")
-        self.spots_lock = threading.Semaphore(100)  # 100 spots available
-        self.players_in_round = []
-        self.round_lock = threading.Lock()
-        self.round_active = False,
-        self.round_thread = threading.Thread(target=self.run_bingo_rounds, daemon=True)
-        self.round_thread.start()
+    def start_game(self):
+        """Starts the game with the current players."""
+        for player, bet_amount in list(self.players.items()):
+            player.play(self.name, self.logo, bet_amount, self.winning_probability, self.gain)
+        self.players.clear()  # Reset the table for the next game
 
-    def play(self, player, bet_amount):
-        """Allows players to join a Bingo round and waits for the round to start."""
-        num_cards = random.randint(1,5)  # Each Bingo card costs $5
-       
-        print(f"⚪ {player.name} is waiting for a Bingo round with {num_cards} cards...")
-
-        with self.spots_lock:
-            with self.round_lock:
-                if not player.place_bet(num_cards * 5, self.name):
-                    return
-                self.players_in_round.append((player, num_cards))
-
-    def run_bingo_rounds(self):
-        """Continuously runs Bingo rounds whenever enough players are ready."""
+    def run(self):
+        """Continuously runs the game, waiting for players and starting when conditions are met."""
+        start_time = time.time()
         while True:
-            time.sleep(5)  # Wait for more players to join
-            self.start_round()
-
-    def start_round(self):
-        """Begins a new Bingo round if there are players."""
-        with self.round_lock:
-            if self.round_active or len(self.players_in_round) < 2:
-                return  # Avoid multiple rounds or starting with one player
-
-            self.round_active = True
-            print(f"🎱 Bingo round is starting with {len(self.players_in_round)} players!")
-            time.sleep(5)  # Simulate Bingo game duration
-
-            # Pick a single winner weighted by number of cards owned
-            players, weights = zip(*self.players_in_round)
-            winner = random.choices(players, weights=weights, k=1)[0]
-
-            print(f"🎉 ⚪ {winner.name} won the Bingo round and received $100!")
-            winner.add_winnings(100, self.name)
-
-            # Ask players if they want to stay
-            staying_players = []
-            for player, num_cards in self.players_in_round:
-                if random.random() < 0.70:  # 70% chance to stay for another round
-                    print(f"⚪ {player.name} decides to stay for another Bingo round.")
-                    staying_players.append((player, num_cards))
-                else:
-                    print(f"🚪 {player.name} leaves the Bingo game.")
-
-            self.players_in_round = staying_players  # Keep only those staying
-            self.round_active = False  # Allow new players to join
-
- 
-            
-
+            # If the time exceeds max waiting time
+            if (time.time() - start_time) > self.max_wait_time:
+                with self.table_lock:
+                    # Player in the game, then game starts
+                    if len(self.players) > 0:
+                        self.start_game()
+                        start_time = time.time()
+            with self.table_lock:
+                if len(self.players) == self.capacity:
+                    self.start_game()
+                    start_time = time.time()
 
 
 class Casino:
     """Casino manages players and games with multiple machines."""
-    def __init__(self, max_players=230):
+    def __init__(self):
         self.players = []
+        self.players_lock = threading.Lock()
         self.games = {
-            "Blackjack": Blackjack(),
-            "Roulette": Roulette(),
-            "Slot Machine": SlotMachine(),
-            "Bingo": Bingo()
+            # GAME : WAITING GAME
         }
-        self.max_players = max_players
+        self.max_players = 0
+
+    def add_game(self, game):
+        self.games[game.name] = game
+        self.max_players += game.capacity
 
     def add_player(self, player):
-        self.players.append(player)
+        with self.players_lock:
+            self.players.append(player)
 
     def play_game(self, player, game_name, bet_amount):
         if game_name in self.games:
             game = self.games[game_name]
-            thread = threading.Thread(target=game.play, args=(player, bet_amount))
-            thread.start()
+            game.add_player(player, bet_amount)
         else:
             print(f"❌ {game_name} is not available in the casino.")
 
     def start_simulation(self):
         """Starts the casino simulation with multiple players."""
+
+        print(self.max_players)
+
         for i in range(self.max_players):
             player = Player(name=f"Player-{i+1}", balance=random.randint(500, 1500), casino=self)
             self.add_player(player)
@@ -214,8 +169,9 @@ class Casino:
         for player in self.players:
             player.join()
 
-# Running the simulation
-if __name__ == "__main__":
-    casino = Casino(max_players=230)  # Simulate a casino with 230 players
-    casino.start_simulation()
-    print("🎰 Casino simulation complete!")
+
+
+
+casino = Casino()
+casino.add_game(Blackjack())
+casino.start_simulation()
