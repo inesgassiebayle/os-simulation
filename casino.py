@@ -12,6 +12,7 @@ class Casino:
         self.customers = []
         self.customers_lock = threading.Lock()
 
+
     def add_game(self, game):
         if game.name not in self.games:
             self.games[game.name] = {'wait_list': [], 'lock': threading.Lock()}
@@ -58,3 +59,5 @@ class Casino:
 
 casino = Casino()
 casino.open_casino()
+
+print("hi")
