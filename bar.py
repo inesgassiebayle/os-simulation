@@ -57,15 +57,15 @@ class Barista(threading.Thread):
             with self.bar.lock:
                 if not self.bar.orders:
                     time.sleep(2)
-                    print(f"👩‍🍳 Barista-{self.id} does not have a customer to attend.")
+                    print(f"Barista-{self.id} does not have a customer to attend.")
                     continue
                 order = self.bar.orders.pop(0)
                 order.set_status("in_progress")
-                print(f"👩‍🍳 Barista-{self.id} preparing order for customer {order.customer.id} will take {order.get_estimated_time()} seconds")
+                print(f"Barista-{self.id} preparing order for customer {order.customer.id} will take {order.get_estimated_time()} seconds")
             for item in order.items:
                 time.sleep(item.prep_time)
             order.set_status("processed")
-            print(f"👩‍🍳 Barista-{self.id} done preparing order for customer {order.customer.id}")
+            print(f"Barista-{self.id} done preparing order for customer {order.customer.id}")
 
 
 

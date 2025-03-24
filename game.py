@@ -20,12 +20,12 @@ class Game(threading.Thread):
             with self.casino.games[self.name]['lock']:
                 players = len(self.casino.games[self.name]['wait_list'])
                 if players == 0:
-                    print(f"{self.logo} No players in {self.name} {self.id}")
+                    print(f"No players in {self.name} {self.id}")
                     time.sleep(random.randint(1, 10))
                     continue
 
                 num_players = min(players, self.capacity)
-                print(f"{self.logo} Game {self.name} {self.id} starting with {num_players} players")
+                print(f"Game {self.name} {self.id} starting with {num_players} players")
 
                 for _ in range(num_players):
                     player = self.casino.games[self.name]['wait_list'].pop(0)

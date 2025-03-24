@@ -9,12 +9,12 @@ class BlackJack(Game):
 
 class Roulette(Game):
     def __init__(self, casino, id):
-        super().__init__(casino, "Roulette", "🎡", 10, 0.486, 2, id)
+        super().__init__(casino, "Roulette", "🎡", 30, 0.486, 2, id)
 
 
 class SlotMachine(Game):
     def __init__(self, casino, id):
-        super().__init__(casino, "Slot Machine", "🎰", 1, 0.3, 2, id)
+        super().__init__(casino, "Slot Machine", "🎰", 1, 0.1, 2, id)
 
 
 class Craps(Game):

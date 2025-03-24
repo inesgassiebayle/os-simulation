@@ -59,5 +59,3 @@ class Casino:
 
 casino = Casino()
 casino.open_casino()
-
-print("hi")
