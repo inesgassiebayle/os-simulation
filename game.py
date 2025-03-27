@@ -20,7 +20,6 @@ class Game(threading.Thread):
             with self.casino.games[self.name]['lock']:
                 players = len(self.casino.games[self.name]['wait_list'])
                 if players == 0:
-                    print(f"No players in {self.name} {self.id}")
                     time.sleep(random.randint(1, 10))
                     continue
 

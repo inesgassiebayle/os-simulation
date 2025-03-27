@@ -31,7 +31,7 @@ class Customer(threading.Thread):
             return self.balance
 
     def play(self, amount, name, logo, probability, prize):
-        print(f"{logo} Customer-{self.id} playing {name}")
+        print(f"Customer-{self.id} playing {name}")
         if not self.decrease(amount):
             self.casino.add_customer(self)
             return
@@ -54,7 +54,7 @@ class Customer(threading.Thread):
             order.add_item(item)
         with self.lock:
             if order.get_total() > self.balance:
-                print(f"Customer-{self.id} could not place order of ${order.get_total()}. (Balance: ${self.balance}")
+                print(f"Customer-{self.id} could not place order of ${order.get_total()}. (Balance: ${self.balance})")
                 return
         with bar.lock:
             self.decrease(order.get_total())

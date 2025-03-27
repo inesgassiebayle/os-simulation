@@ -30,7 +30,7 @@ class Casino:
                  + [BlackJack(self, i) for i in range(2)]
                  + [Craps(self, i) for i in range(7)]
                  + [Poker(self, i) for i in range(10)])
-        customers = [Customer(i, self, random.randint(50, 200)) for i in range(15)]
+        customers = [Customer(i, self, random.randint(50, 200)) for i in range(30)]
 
         bars = create_bars()
 

@@ -57,7 +57,6 @@ class Barista(threading.Thread):
             with self.bar.lock:
                 if not self.bar.orders:
                     time.sleep(2)
-                    print(f"Barista-{self.id} does not have a customer to attend.")
                     continue
                 order = self.bar.orders.pop(0)
                 order.set_status("in_progress")
