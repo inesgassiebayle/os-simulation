@@ -27,6 +27,5 @@ class Game(threading.Thread):
 
                 for _ in range(num_players):
                     player = self.casino.games[self.name]['wait_list'].pop(0)
-                    bet_amount = random.randint(5, player.get_balance())
-                    player.play(bet_amount, self.name, self.probability, self.prize)
+                    player.play(self.name, self.probability, self.prize)
             time.sleep(random.randint(1, 5))

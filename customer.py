@@ -2,15 +2,24 @@ import threading
 import time
 import random
 from bar import Order
+from abc import abstractmethod
 
 
 class Customer(threading.Thread):
-    def __init__(self, id, casino, balance):
+    def __init__(self, id, casino, balance, p_leaving, p_strategizing, p_ordering, p_playing):
         super().__init__()
         self.id = id
         self.casino = casino
         self.balance = balance
         self.lock = threading.Lock()
+        self.p_leaving = p_leaving
+        self.p_strategizing = p_strategizing
+        self.p_ordering = p_ordering
+        self.p_playing = p_playing
+
+    @abstractmethod
+    def amount_bet(self):
+        pass
 
     def increment(self, amount):
         with self.lock:
@@ -30,7 +39,8 @@ class Customer(threading.Thread):
         with self.lock:
             return self.balance
 
-    def play(self, amount, name, probability, prize):
+    def play(self, name, probability, prize):
+        amount = self.amount_bet()
         print(f"Customer-{self.id} playing {name}")
         if not self.decrease(amount):
             self.casino.add_customer(self)
@@ -74,19 +84,19 @@ class Customer(threading.Thread):
                 print(f"Customer-{self.id} is out of money and leaves the casino.")
                 break
 
-            if random.random() < 0.20:  # 20% chance to leave
+            if random.random() < self.p_leaving:  # 20% chance to leave
                 print(f"Customer-{self.id} has decided to leave the casino.")
                 break
 
-            if random.random() < 0.10:  # 10% chance to leave strategically
+            if random.random() < self.p_strategizing:  # 10% chance to leave strategically
                 print(f"Customer-{self.id} is leaving the casino after strategizing.")
                 break
 
             # Random probability of purchasing something in a bar
-            if random.random() < 0.40:
+            if random.random() < self.p_ordering:
                self.place_order()
 
-            if random.random() < 0.6:
+            if random.random() < self.p_playing:
                 # Random selection of the game
                 game = random.choice(list(self.casino.games.keys()))
                 print(f"Customer-{self.id} selected the game '{game}'")
@@ -101,3 +111,39 @@ class Customer(threading.Thread):
                 self.casino.games[game]['lock'].release()
 
             time.sleep(random.randint(1, 5))
+
+
+class TiredCustomer(Customer):
+    def __init__(self, id, casino, balance):
+        super().__init__(id, casino, balance, 0.8, 0, 0.5, 0.3)
+
+    def amount_bet(self):
+        return random.randint(1, self.get_balance()/2)
+
+
+class RiskyPlayer(Customer):
+    def __init__(self, id, casino, balance):
+        super().__init__(id, casino, balance, 0.1, 0, 0.5, 0.9)
+    def amount_bet(self):
+        return random.randint(1, self.get_balance())
+
+
+class CheatingPlayer(Customer):
+    def __init__(self, id, casino, balance):
+        super().__init__(id, casino, balance, 0.1, 0.8, 0.5, 0.9)
+    def amount_bet(self):
+        return random.randint(1, self.get_balance()/2)
+
+
+class RichPlayer(Customer):
+    def __init__(self, id, casino, balance):
+        super().__init__(id, casino, balance * 3, 0.1, 0.3, 0.9, 0.9)
+    def amount_bet(self):
+        return random.randint(1, self.get_balance())
+
+
+class SafePlayer(Customer):
+    def __init__(self, id, casino, balance):
+        super().__init__(id, casino, balance, 0.4, 0, 0.2, 0.5)
+    def amount_bet(self):
+        return random.randint(1, self.get_balance()/2)
