@@ -30,7 +30,7 @@ class Customer(threading.Thread):
         with self.lock:
             return self.balance
 
-    def play(self, amount, name, logo, probability, prize):
+    def play(self, amount, name, probability, prize):
         print(f"Customer-{self.id} playing {name}")
         if not self.decrease(amount):
             self.casino.add_customer(self)
@@ -86,17 +86,18 @@ class Customer(threading.Thread):
             if random.random() < 0.40:
                self.place_order()
 
-            # Random selection of the game
-            game = random.choice(list(self.casino.games.keys()))
-            print(f"Customer-{self.id} selected the game '{game}'")
+            if random.random() < 0.6:
+                # Random selection of the game
+                game = random.choice(list(self.casino.games.keys()))
+                print(f"Customer-{self.id} selected the game '{game}'")
 
-            # Lock both available players and wait_list modification
-            self.casino.games[game]['lock'].acquire()
-            self.casino.customers_lock.acquire()
-            self.casino.games[game]['wait_list'].append(self)
-            self.casino.customers.remove(self)
-            print(f"Customer-{self.id} is ready to play the game '{game}'")
-            self.casino.customers_lock.release()
-            self.casino.games[game]['lock'].release()
+                # Lock both available players and wait_list modification
+                self.casino.games[game]['lock'].acquire()
+                self.casino.customers_lock.acquire()
+                self.casino.games[game]['wait_list'].append(self)
+                self.casino.customers.remove(self)
+                print(f"Customer-{self.id} is ready to play the game '{game}'")
+                self.casino.customers_lock.release()
+                self.casino.games[game]['lock'].release()
 
             time.sleep(random.randint(1, 5))
