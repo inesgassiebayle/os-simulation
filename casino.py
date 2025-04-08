@@ -1,8 +1,9 @@
 import threading
 import random
 from game_implementations import Roulette, SlotMachine, BlackJack, Craps, Poker
-from customer import Customer
+from customer import TiredCustomer, RiskyPlayer, RichPlayer, CheatingPlayer, SafePlayer
 from bar import create_bars, Barista
+from parking_lot import Parking
 
 
 class Casino:
@@ -11,6 +12,7 @@ class Casino:
         self.bars = {}
         self.customers = []
         self.customers_lock = threading.Lock()
+        self.parking = Parking()
 
 
     def add_game(self, game):
@@ -30,7 +32,13 @@ class Casino:
                  + [BlackJack(self, i) for i in range(2)]
                  + [Craps(self, i) for i in range(7)]
                  + [Poker(self, i) for i in range(10)])
-        customers = [Customer(i, self, random.randint(50, 200)) for i in range(30)]
+        customers = []
+        customer_types = [TiredCustomer, RiskyPlayer, CheatingPlayer, RichPlayer, SafePlayer]
+
+        for i in range(50):
+            customer_type = random.choice(customer_types)
+            customers.append(customer_type(i, self, random.randint(50, 200)))
+            print(f"Customer-{i} is type {customer_type}")
 
         bars = create_bars()
 

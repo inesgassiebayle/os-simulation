@@ -3,6 +3,7 @@ import time
 import random
 from bar import Order
 from abc import abstractmethod
+from parking_lot import Car
 
 
 class Customer(threading.Thread):
@@ -16,6 +17,7 @@ class Customer(threading.Thread):
         self.p_strategizing = p_strategizing
         self.p_ordering = p_ordering
         self.p_playing = p_playing
+        self.car = random.choice([None, Car(id)])
 
     @abstractmethod
     def amount_bet(self):
@@ -72,6 +74,10 @@ class Customer(threading.Thread):
         print(f"Customer-{self.id} ordered {[item.name for item in order.items]} (Total: ${order.get_total()}, Balance: ${self.balance})")
 
     def run(self):
+        if self.car:
+            parked = self.car.park(self.casino.parking)
+            if not parked:
+                print(f"Customer-{self.id} could not park the car and decided to leave")
         while True:
             # Customer is playing or waiting to play
             with self.casino.customers_lock:
@@ -82,14 +88,20 @@ class Customer(threading.Thread):
             # Player leaves the casino
             if self.balance <= 0:
                 print(f"Customer-{self.id} is out of money and leaves the casino.")
+                if self.car and self.car.slot is not None:
+                    self.car.de_park()
                 break
 
             if random.random() < self.p_leaving:  # 20% chance to leave
                 print(f"Customer-{self.id} has decided to leave the casino.")
+                if self.car  and self.car.slot is not None:
+                    self.car.de_park()
                 break
 
             if random.random() < self.p_strategizing:  # 10% chance to leave strategically
                 print(f"Customer-{self.id} is leaving the casino after strategizing.")
+                if self.car and self.car.slot is not None:
+                    self.car.de_park()
                 break
 
             # Random probability of purchasing something in a bar
@@ -118,7 +130,7 @@ class TiredCustomer(Customer):
         super().__init__(id, casino, balance, 0.8, 0, 0.5, 0.3)
 
     def amount_bet(self):
-        return random.randint(1, self.get_balance()/2)
+        return random.randint(1, round(self.get_balance()/2))
 
 
 class RiskyPlayer(Customer):
@@ -132,7 +144,7 @@ class CheatingPlayer(Customer):
     def __init__(self, id, casino, balance):
         super().__init__(id, casino, balance, 0.1, 0.8, 0.5, 0.9)
     def amount_bet(self):
-        return random.randint(1, self.get_balance()/2)
+        return random.randint(1, round(self.get_balance()/2))
 
 
 class RichPlayer(Customer):
@@ -146,4 +158,4 @@ class SafePlayer(Customer):
     def __init__(self, id, casino, balance):
         super().__init__(id, casino, balance, 0.4, 0, 0.2, 0.5)
     def amount_bet(self):
-        return random.randint(1, self.get_balance()/2)
+        return random.randint(1, round(self.get_balance()/2))
