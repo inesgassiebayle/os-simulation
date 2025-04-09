@@ -58,6 +58,7 @@ class Customer(threading.Thread):
 
     def place_order(self):
         bar_name = random.choice(list(self.casino.bars.keys()))
+        print(f"Customer-{self.id} will place order in bar {bar_name}")
         order = Order(self)
         num_items = random.randint(1, 7)
         bar = self.casino.bars[bar_name]
@@ -72,6 +73,37 @@ class Customer(threading.Thread):
             self.decrease(order.get_total())
             bar.orders.append(order)
         print(f"Customer-{self.id} ordered {[item.name for item in order.items]} (Total: ${order.get_total()}, Balance: ${self.balance})")
+
+    def place_restaurant_order(self, restaurant, total):
+        order = Order(self)
+        num_items = random.randint(1, 7)
+        items = random.choices(restaurant.menu.products, k=num_items)
+        for item in items:
+            order.add_item(item)
+        with self.lock:
+            if order.get_total() + total > self.balance:
+                print(f"Customer-{self.id} could not place order of ${order.get_total()}. (Balance: ${self.balance})")
+                return 0
+        with restaurant.lock:
+            restaurant.orders.append(order)
+        print(f"Customer-{self.id} ordered {[item.name for item in order.items]} (Total: ${order.get_total()}, Balance: ${self.balance - total - order.get_total()})")
+        return order.get_total()
+
+    def enter_restaurant(self):
+        restaurant = random.choice(list(self.casino.restaurants))
+        print(f"Customer-{self.id} is trying to seat at {restaurant.name}")
+        seated = restaurant.seat_customer(self)
+        if seated:
+            total_payed = 0
+            while True:
+                if random.random() < self.p_ordering:
+                    amount = self.place_restaurant_order(restaurant, total_payed)
+                    total_payed += amount
+                else:
+                    break
+                time.sleep(random.randint(1, 10))
+            self.decrease(total_payed)
+            restaurant.de_seat_customer(self)
 
     def run(self):
         if self.car:
@@ -108,6 +140,9 @@ class Customer(threading.Thread):
             if random.random() < self.p_ordering:
                self.place_order()
 
+            if random.random() < self.p_ordering:
+                self.enter_restaurant()
+
             if random.random() < self.p_playing:
                 # Random selection of the game
                 game = random.choice(list(self.casino.games.keys()))
@@ -137,7 +172,7 @@ class RiskyPlayer(Customer):
     def __init__(self, id, casino, balance):
         super().__init__(id, casino, balance, 0.1, 0, 0.5, 0.9)
     def amount_bet(self):
-        return random.randint(1, self.get_balance())
+        return random.randint(1, round(self.get_balance()))
 
 
 class CheatingPlayer(Customer):
@@ -151,7 +186,7 @@ class RichPlayer(Customer):
     def __init__(self, id, casino, balance):
         super().__init__(id, casino, balance * 3, 0.1, 0.3, 0.9, 0.9)
     def amount_bet(self):
-        return random.randint(1, self.get_balance())
+        return random.randint(1, round(self.get_balance()))
 
 
 class SafePlayer(Customer):

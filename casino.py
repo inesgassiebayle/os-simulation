@@ -4,7 +4,7 @@ from game_implementations import Roulette, SlotMachine, BlackJack, Craps, Poker
 from customer import TiredCustomer, RiskyPlayer, RichPlayer, CheatingPlayer, SafePlayer
 from bar import create_bars, Barista
 from parking_lot import Parking
-
+from restaurant import create_restaurants, Waiter
 
 class Casino:
     def __init__(self):
@@ -13,6 +13,7 @@ class Casino:
         self.customers = []
         self.customers_lock = threading.Lock()
         self.parking = Parking()
+        self.restaurants = []
 
 
     def add_game(self, game):
@@ -21,6 +22,9 @@ class Casino:
 
     def add_bar(self, bar):
         self.bars[bar.name] = bar
+
+    def add_restaurant(self, restaurant):
+        self.restaurants.append(restaurant)
 
     def add_customer(self, customer):
         with self.customers_lock:
@@ -40,6 +44,17 @@ class Casino:
             customers.append(customer_type(i, self, random.randint(50, 200)))
             print(f"Customer-{i} is type {customer_type}")
 
+        restaurants = create_restaurants(self)
+
+        waiters = []
+
+        for restaurant in restaurants:
+            for i in range(5):
+                waiters.append(Waiter(i, restaurant))
+
+        for restaurant in restaurants:
+            self.add_restaurant(restaurant)
+
         bars = create_bars()
 
         baristas = []
@@ -57,12 +72,14 @@ class Casino:
         for barista in baristas:
             barista.start()
 
+        for waiter in waiters:
+            waiter.start()
+
         for game in games:
             game.start()
 
         for customer in customers:
             customer.start()
-
 
 
 casino = Casino()
