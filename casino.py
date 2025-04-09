@@ -5,6 +5,7 @@ from customer import TiredCustomer, RiskyPlayer, RichPlayer, CheatingPlayer, Saf
 from bar import create_bars, Barista
 from parking_lot import Parking
 from restaurant import create_restaurants, Waiter
+from hotel import Hotel
 
 class Casino:
     def __init__(self):
@@ -14,6 +15,7 @@ class Casino:
         self.customers_lock = threading.Lock()
         self.parking = Parking()
         self.restaurants = []
+        self.hotel = Hotel(10)
 
 
     def add_game(self, game):

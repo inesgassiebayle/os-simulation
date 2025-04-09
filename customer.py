@@ -7,7 +7,7 @@ from parking_lot import Car
 
 
 class Customer(threading.Thread):
-    def __init__(self, id, casino, balance, p_leaving, p_strategizing, p_ordering, p_playing):
+    def __init__(self, id, casino, balance, p_leaving, p_strategizing, p_ordering, p_playing, p_sleeping=0.5):
         super().__init__()
         self.id = id
         self.casino = casino
@@ -18,6 +18,8 @@ class Customer(threading.Thread):
         self.p_ordering = p_ordering
         self.p_playing = p_playing
         self.car = random.choice([None, Car(id)])
+        self.p_sleeping = p_sleeping
+        self.booked_room = None
 
     @abstractmethod
     def amount_bet(self):
@@ -120,21 +122,25 @@ class Customer(threading.Thread):
             # Player leaves the casino
             if self.balance <= 0:
                 print(f"Customer-{self.id} is out of money and leaves the casino.")
-                if self.car and self.car.slot is not None:
-                    self.car.de_park()
                 break
 
             if random.random() < self.p_leaving:  # 20% chance to leave
                 print(f"Customer-{self.id} has decided to leave the casino.")
-                if self.car  and self.car.slot is not None:
-                    self.car.de_park()
                 break
 
             if random.random() < self.p_strategizing:  # 10% chance to leave strategically
                 print(f"Customer-{self.id} is leaving the casino after strategizing.")
-                if self.car and self.car.slot is not None:
-                    self.car.de_park()
                 break
+
+            if random.random() < self.p_sleeping and self.booked_room is None:
+                sleep_duration = random.randint(1, 50)
+                price = sleep_duration * self.casino.hotel.price_per_second
+                with self.lock:
+                    if price > self.balance:
+                        print(f"Customer-{self.id} does not have enough money to book the hotel for {sleep_duration} seconds.")
+                print(f"Customer-{self.id} will book hotel for {sleep_duration} seconds")
+                self.decrease(price)
+                self.booked_room = self.casino.hotel.book_room(self, sleep_duration)
 
             # Random probability of purchasing something in a bar
             if random.random() < self.p_ordering:
@@ -158,6 +164,9 @@ class Customer(threading.Thread):
                 self.casino.games[game]['lock'].release()
 
             time.sleep(random.randint(1, 5))
+
+        if self.car and self.car.slot is not None:
+            self.car.de_park()
 
 
 class TiredCustomer(Customer):
