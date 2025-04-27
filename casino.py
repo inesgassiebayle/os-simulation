@@ -1,6 +1,6 @@
 import threading
 import random
-from game_implementations import Roulette, SlotMachine, BlackJack, Craps, Poker
+from game_implementations import RouletteFactory, BlackJackFactory, CrapsFactory, SlotMachineFactory, PokerFactory
 from customer_factory import GamblerFactory, OrderingAddictFactory, StrategistFactory, BudgetPlayerFactory, DrunkenGamblerFactory, AdventurerFactory, MinimalistFactory, RichPlayerFactory, RiskyCheatingFactory, RiskyPlayerFactory, ShopperFactory, SafePlayerFactory, TiredCustomerFactory, VipFactory
 from bar import create_bars, Barista
 from parking_lot import Parking
@@ -83,19 +83,19 @@ class Casino:
         n_games = 0
         games = []
         for _ in range(5):
-            games.append(Roulette(self, n_games))
+            games.append(RouletteFactory(self).create_game(n_games))
             n_games += 1
         for _ in range(10):
-            games.append(SlotMachine(self, n_games))
+            games.append(SlotMachineFactory(self).create_game(n_games))
             n_games += 1
         for _ in range(2):
-            games.append(BlackJack(self, n_games))
+            games.append(BlackJackFactory(self).create_game(n_games))
             n_games += 1
         for _ in range(7):
-            games.append(Craps(self, n_games))
+            games.append(CrapsFactory(self).create_game(n_games))
             n_games += 1
         for _ in range(10):
-            games.append(Poker(self, n_games))
+            games.append(PokerFactory(self).create_game(n_games))
             n_games +=1
 
         for game in games:
