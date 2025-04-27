@@ -1,7 +1,7 @@
 import threading
 import random
 from game_implementations import Roulette, SlotMachine, BlackJack, Craps, Poker
-from customer import TiredCustomer, RiskyPlayer, RichPlayer, CheatingPlayer, SafePlayer
+from customer_factory import GamblerFactory, OrderingAddictFactory, StrategistFactory, BudgetPlayerFactory, DrunkenGamblerFactory, AdventurerFactory, MinimalistFactory, RichPlayerFactory, RiskyCheatingFactory, RiskyPlayerFactory, ShopperFactory, SafePlayerFactory, TiredCustomerFactory, VipFactory
 from bar import create_bars, Barista
 from parking_lot import Parking
 from restaurant import create_restaurants, Waiter
@@ -39,18 +39,17 @@ class Casino:
         cursor = conn.cursor()
 
         customers = []
-        customer_types = [TiredCustomer, RiskyPlayer, CheatingPlayer, RichPlayer, SafePlayer]
+        factories = [GamblerFactory(self), OrderingAddictFactory(self), StrategistFactory(self), BudgetPlayerFactory(self), DrunkenGamblerFactory(self), AdventurerFactory(self), MinimalistFactory(self), RichPlayerFactory(self), RiskyCheatingFactory(self), RiskyPlayerFactory(self), ShopperFactory(self), SafePlayerFactory(self), TiredCustomerFactory(self), VipFactory(self)]
 
         # Crear customers
         for i in range(50):
-            customer_type = random.choice(customer_types)
-            customer = customer_type(i, self, random.randint(50, 200))
+            factory = random.choice(factories)
+            customer = factory.create_customer(i)
             customers.append(customer)
-            print(f"Customer-{i} is type {customer_type.__name__}")
             cursor.execute("""
                 INSERT INTO customer (initial_balance, customer_type, has_car)
                 VALUES (?, ?, ?)
-            """, (customer.balance, customer_type.__name__, 1 if customer.car else 0))
+            """, (customer.balance, customer.type, 1 if customer.car else 0))
 
 
         bars = create_bars()

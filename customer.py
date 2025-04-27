@@ -6,8 +6,9 @@ from parking_lot import Car
 from db import save_order, save_game_play, save_permanence_record, close_permanence_record, save_failed_parking
 import time
 
+
 class Customer(threading.Thread):
-    def __init__(self, id, casino, balance, p_leaving, p_strategizing, p_ordering, p_playing, p_sleeping=0.5):
+    def __init__(self, id, casino, balance, p_leaving, p_strategizing, p_ordering, p_playing, type, p_sleeping=0.5, min_bet=1, max_bet=100):
         super().__init__()
         self.id = id
         self.casino = casino
@@ -17,14 +18,17 @@ class Customer(threading.Thread):
         self.p_strategizing = p_strategizing
         self.p_ordering = p_ordering
         self.p_playing = p_playing
-        self.car = random.choice([None, Car(id)])
         self.p_sleeping = p_sleeping
+        self.min_bet = min_bet
+        self.max_bet = max_bet
+        self.car = random.choice([None, Car(id)])
         self.booked_room = None
         self.permanence_id = None
+        self.type = type
 
-    @abstractmethod
     def amount_bet(self):
-        pass
+        return random.randint(self.min_bet, min(self.max_bet, self.get_balance()))
+
 
     def increment(self, amount):
         with self.lock:
@@ -180,37 +184,5 @@ class Customer(threading.Thread):
             close_permanence_record(self.permanence_id)
 
 
-class TiredCustomer(Customer):
-    def __init__(self, id, casino, balance):
-        super().__init__(id, casino, balance, 0.8, 0, 0.5, 0.3)
-
-    def amount_bet(self):
-        return random.randint(1, round(self.get_balance()/2))
 
 
-class RiskyPlayer(Customer):
-    def __init__(self, id, casino, balance):
-        super().__init__(id, casino, balance, 0.1, 0, 0.5, 0.9)
-    def amount_bet(self):
-        return random.randint(1, round(self.get_balance()))
-
-
-class CheatingPlayer(Customer):
-    def __init__(self, id, casino, balance):
-        super().__init__(id, casino, balance, 0.1, 0.8, 0.5, 0.9)
-    def amount_bet(self):
-        return random.randint(1, round(self.get_balance()/2))
-
-
-class RichPlayer(Customer):
-    def __init__(self, id, casino, balance):
-        super().__init__(id, casino, balance * 3, 0.1, 0.3, 0.9, 0.9)
-    def amount_bet(self):
-        return random.randint(1, round(self.get_balance()))
-
-
-class SafePlayer(Customer):
-    def __init__(self, id, casino, balance):
-        super().__init__(id, casino, balance, 0.4, 0, 0.2, 0.5)
-    def amount_bet(self):
-        return random.randint(1, round(self.get_balance()/2))
