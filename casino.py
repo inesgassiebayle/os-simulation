@@ -6,6 +6,8 @@ from bar import create_bars, Barista
 from parking_lot import Parking
 from restaurant import create_restaurants, Waiter
 from hotel import Hotel
+import sqlite3
+import os
 
 class Casino:
     def __init__(self):
@@ -15,8 +17,7 @@ class Casino:
         self.customers_lock = threading.Lock()
         self.parking = Parking()
         self.restaurants = []
-        self.hotel = Hotel(10)
-
+        self.hotel = Hotel(10, casino=self)
 
     def add_game(self, game):
         if game.name not in self.games:
@@ -33,23 +34,81 @@ class Casino:
             self.customers.append(customer)
 
     def open_casino(self):
-        games = ([Roulette(self, i) for i in range(5)]
-                 + [SlotMachine(self, i) for i in range(10)]
-                 + [BlackJack(self, i) for i in range(2)]
-                 + [Craps(self, i) for i in range(7)]
-                 + [Poker(self, i) for i in range(10)])
+        db_path = os.path.join(os.path.dirname(__file__), "casino.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
         customers = []
         customer_types = [TiredCustomer, RiskyPlayer, CheatingPlayer, RichPlayer, SafePlayer]
 
+        # Crear customers
         for i in range(50):
             customer_type = random.choice(customer_types)
-            customers.append(customer_type(i, self, random.randint(50, 200)))
-            print(f"Customer-{i} is type {customer_type}")
+            customer = customer_type(i, self, random.randint(50, 200))
+            customers.append(customer)
+            print(f"Customer-{i} is type {customer_type.__name__}")
+            cursor.execute("""
+                INSERT INTO customer (initial_balance, customer_type, has_car)
+                VALUES (?, ?, ?)
+            """, (customer.balance, customer_type.__name__, 1 if customer.car else 0))
+
+
+        bars = create_bars()
+        bar_id_map = {}
+        for bar in bars:
+            cursor.execute("""
+                INSERT INTO bar (name) VALUES (?)
+            """, (bar.name,))
+            bar_id = cursor.lastrowid
+            bar_id_map[bar.name] = bar_id
+            for item in bar.menu.products:
+                cursor.execute("""
+                    INSERT INTO menu_item (name, price, prep_time, source_type, source_id)
+                    VALUES (?, ?, ?, 'bar', ?)
+                """, (item.name, item.price, item.prep_time, bar_id))
 
         restaurants = create_restaurants(self)
+        restaurant_id_map = {}
+        for restaurant in restaurants:
+            cursor.execute("""
+                INSERT INTO restaurant (name, num_tables) VALUES (?, ?)
+            """, (restaurant.name, restaurant.num_tables))
+            restaurant_id = cursor.lastrowid
+            restaurant_id_map[restaurant.name] = restaurant_id
+            for item in restaurant.menu.products:
+                cursor.execute("""
+                    INSERT INTO menu_item (name, price, prep_time, source_type, source_id)
+                    VALUES (?, ?, ?, 'restaurant', ?)
+                """, (item.name, item.price, item.prep_time, restaurant_id))
+
+        n_games = 0
+        games = []
+        for _ in range(5):
+            games.append(Roulette(self, n_games))
+            n_games += 1
+        for _ in range(10):
+            games.append(SlotMachine(self, n_games))
+            n_games += 1
+        for _ in range(2):
+            games.append(BlackJack(self, n_games))
+            n_games += 1
+        for _ in range(7):
+            games.append(Craps(self, n_games))
+            n_games += 1
+        for _ in range(10):
+            games.append(Poker(self, n_games))
+            n_games +=1
+
+        for game in games:
+            cursor.execute("""
+                INSERT INTO game_instance (game_name)
+                VALUES (?)
+            """, (game.name,))
+
+        conn.commit()
+        conn.close()
 
         waiters = []
-
         for restaurant in restaurants:
             for i in range(5):
                 waiters.append(Waiter(i, restaurant))
@@ -57,10 +116,7 @@ class Casino:
         for restaurant in restaurants:
             self.add_restaurant(restaurant)
 
-        bars = create_bars()
-
         baristas = []
-
         for bar in bars:
             for i in range(5):
                 baristas.append(Barista(i, bar))
@@ -78,11 +134,14 @@ class Casino:
             waiter.start()
 
         for game in games:
+            self.add_game(game)
+
+        for game in games:
             game.start()
 
         for customer in customers:
             customer.start()
 
-
-casino = Casino()
-casino.open_casino()
+if __name__ == "__main__":
+    casino = Casino()
+    casino.open_casino()

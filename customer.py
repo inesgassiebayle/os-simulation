@@ -1,10 +1,10 @@
 import threading
-import time
 import random
 from bar import Order
 from abc import abstractmethod
 from parking_lot import Car
-
+from db import save_order, save_game_play, save_permanence_record, close_permanence_record, save_failed_parking
+import time
 
 class Customer(threading.Thread):
     def __init__(self, id, casino, balance, p_leaving, p_strategizing, p_ordering, p_playing, p_sleeping=0.5):
@@ -20,6 +20,7 @@ class Customer(threading.Thread):
         self.car = random.choice([None, Car(id)])
         self.p_sleeping = p_sleeping
         self.booked_room = None
+        self.permanence_id = None
 
     @abstractmethod
     def amount_bet(self):
@@ -43,18 +44,18 @@ class Customer(threading.Thread):
         with self.lock:
             return self.balance
 
-    def play(self, name, probability, prize):
-        amount = self.amount_bet()
+    def play(self, name, probability, prize, game_id):
         print(f"Customer-{self.id} playing {name}")
+        amount = self.amount_bet()
         if not self.decrease(amount):
             self.casino.add_customer(self)
             return
-
         if random.random() < probability:
             self.increment(amount * prize)
+            save_game_play(self.id, game_id, amount, "won")
         else:
             print(f"Customer-{self.id} lost ${amount}. (Balance: ${self.balance})")
-
+            save_game_play(self.id, game_id, amount, "lost")
         self.casino.add_customer(self)
         time.sleep(random.randint(1, 5))
 
@@ -74,7 +75,9 @@ class Customer(threading.Thread):
         with bar.lock:
             self.decrease(order.get_total())
             bar.orders.append(order)
-        print(f"Customer-{self.id} ordered {[item.name for item in order.items]} (Total: ${order.get_total()}, Balance: ${self.balance})")
+        print(
+            f"Customer-{self.id} ordered {[item.name for item in order.items]} (Total: ${order.get_total()}, Balance: ${self.balance})")
+        save_order(self.id, 'bar', list(self.casino.bars.keys()).index(bar_name) + 1, order)
 
     def place_restaurant_order(self, restaurant, total):
         order = Order(self)
@@ -88,7 +91,9 @@ class Customer(threading.Thread):
                 return 0
         with restaurant.lock:
             restaurant.orders.append(order)
-        print(f"Customer-{self.id} ordered {[item.name for item in order.items]} (Total: ${order.get_total()}, Balance: ${self.balance - total - order.get_total()})")
+        print(
+            f"Customer-{self.id} ordered {[item.name for item in order.items]} (Total: ${order.get_total()}, Balance: ${self.balance - total - order.get_total()})")
+        save_order(self.id, 'restaurant', list(self.casino.restaurants).index(restaurant) + 1, order)
         return order.get_total()
 
     def enter_restaurant(self):
@@ -112,14 +117,17 @@ class Customer(threading.Thread):
             parked = self.car.park(self.casino.parking)
             if not parked:
                 print(f"Customer-{self.id} could not park the car and decided to leave")
+                save_failed_parking(self.id)
+                return
+        else:
+            self.permanence_id = save_permanence_record(self.id)
+
         while True:
-            # Customer is playing or waiting to play
             with self.casino.customers_lock:
                 if self not in self.casino.customers:
                     time.sleep(random.randint(1, 5))
                     continue
 
-            # Player leaves the casino
             if self.balance <= 0:
                 print(f"Customer-{self.id} is out of money and leaves the casino.")
                 break
@@ -132,6 +140,22 @@ class Customer(threading.Thread):
                 print(f"Customer-{self.id} is leaving the casino after strategizing.")
                 break
 
+            if random.random() < self.p_playing:
+                game = random.choice(list(self.casino.games.keys()))
+                print(f"Customer-{self.id} selected the game '{game}'")
+                self.casino.games[game]['lock'].acquire()
+                self.casino.customers_lock.acquire()
+                self.casino.games[game]['wait_list'].append(self)
+                self.casino.customers.remove(self)
+                print(f"Customer-{self.id} is ready to play the game '{game}'")
+                self.casino.customers_lock.release()
+                self.casino.games[game]['lock'].release()
+                continue
+
+            if random.random() < self.p_ordering:
+                self.place_order()
+                continue
+
             if random.random() < self.p_sleeping and self.booked_room is None:
                 sleep_duration = random.randint(1, 50)
                 price = sleep_duration * self.casino.hotel.price_per_second
@@ -141,32 +165,19 @@ class Customer(threading.Thread):
                 print(f"Customer-{self.id} will book hotel for {sleep_duration} seconds")
                 self.decrease(price)
                 self.booked_room = self.casino.hotel.book_room(self, sleep_duration)
-
-            # Random probability of purchasing something in a bar
-            if random.random() < self.p_ordering:
-               self.place_order()
+                continue
 
             if random.random() < self.p_ordering:
                 self.enter_restaurant()
-
-            if random.random() < self.p_playing:
-                # Random selection of the game
-                game = random.choice(list(self.casino.games.keys()))
-                print(f"Customer-{self.id} selected the game '{game}'")
-
-                # Lock both available players and wait_list modification
-                self.casino.games[game]['lock'].acquire()
-                self.casino.customers_lock.acquire()
-                self.casino.games[game]['wait_list'].append(self)
-                self.casino.customers.remove(self)
-                print(f"Customer-{self.id} is ready to play the game '{game}'")
-                self.casino.customers_lock.release()
-                self.casino.games[game]['lock'].release()
+                continue
 
             time.sleep(random.randint(1, 5))
 
         if self.car and self.car.slot is not None:
             self.car.de_park()
+
+        if not self.car and self.permanence_id is not None:
+            close_permanence_record(self.permanence_id)
 
 
 class TiredCustomer(Customer):

@@ -2,7 +2,6 @@ import threading
 import random
 import time
 
-
 class Game(threading.Thread):
     def __init__(self, casino, name, capacity, probability, prize, id):
         super().__init__()
@@ -27,5 +26,5 @@ class Game(threading.Thread):
 
                 for _ in range(num_players):
                     player = self.casino.games[self.name]['wait_list'].pop(0)
-                    player.play(self.name, self.probability, self.prize)
+                    player.play(self.name, self.probability, self.prize, self.id)
             time.sleep(random.randint(1, 5))

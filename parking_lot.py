@@ -1,12 +1,14 @@
 import threading
 import random
 import time
+from db import save_parking_record, close_parking_record
 
 class Car:
     def __init__(self, customer_id):
         self.customer_id = customer_id
         self.parked = False
         self.slot = None
+        self.parking_record_id = None
 
     def enter(self):
         print(f"Customer-{self.customer_id} is entering the Parking")
@@ -22,6 +24,7 @@ class Car:
                 with slot.lock:
                     if slot.available():
                         slot.occupy(self)
+                        self.parking_record_id = save_parking_record(self.customer_id, slot.id)
                         return True
 
             if not self.slot:
@@ -41,6 +44,9 @@ class Car:
                 slot.vacate(self)
             self.exit()
 
+            if self.parking_record_id is not None:
+                close_parking_record(self.parking_record_id)
+                self.parking_record_id = None
 
 class ParkingSlot:
     def __init__(self, id):
