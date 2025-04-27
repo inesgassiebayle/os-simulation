@@ -8,7 +8,7 @@ import time
 
 
 class Customer(threading.Thread):
-    def __init__(self, id, casino, balance, p_leaving, p_strategizing, p_ordering, p_playing, type, p_sleeping=0.5, min_bet=1, max_bet=100):
+    def __init__(self, id, casino, balance, p_leaving, p_strategizing, p_ordering, p_playing, type, p_sleeping, min_bet, max_bet, has_car_probability, p_restaurant, game_preferences):
         super().__init__()
         self.id = id
         self.casino = casino
@@ -21,14 +21,15 @@ class Customer(threading.Thread):
         self.p_sleeping = p_sleeping
         self.min_bet = min_bet
         self.max_bet = max_bet
-        self.car = random.choice([None, Car(id)])
+        self.car = Car(id) if random.random() < has_car_probability else None
         self.booked_room = None
         self.permanence_id = None
         self.type = type
+        self.p_restaurant = p_restaurant
+        self.game_preferences = game_preferences
 
     def amount_bet(self):
-        return random.randint(self.min_bet, min(self.max_bet, self.get_balance()))
-
+        return random.randint(min(self.min_bet, self.get_balance()) , min(self.max_bet, self.get_balance()))
 
     def increment(self, amount):
         with self.lock:
@@ -47,6 +48,12 @@ class Customer(threading.Thread):
     def get_balance(self):
         with self.lock:
             return self.balance
+
+    def choose_game(self):
+        games = list(self.game_preferences.keys())
+        probs = list(self.game_preferences.values())
+        selected_game = random.choices(games, weights=probs, k=1)[0]
+        return selected_game
 
     def play(self, name, probability, prize, game_id):
         print(f"Customer-{self.id} playing {name}")
@@ -145,7 +152,7 @@ class Customer(threading.Thread):
                 break
 
             if random.random() < self.p_playing:
-                game = random.choice(list(self.casino.games.keys()))
+                game = self.choose_game()
                 print(f"Customer-{self.id} selected the game '{game}'")
                 self.casino.games[game]['lock'].acquire()
                 self.casino.customers_lock.acquire()
@@ -171,7 +178,7 @@ class Customer(threading.Thread):
                 self.booked_room = self.casino.hotel.book_room(self, sleep_duration)
                 continue
 
-            if random.random() < self.p_ordering:
+            if random.random() < self.p_restaurant:
                 self.enter_restaurant()
                 continue
 

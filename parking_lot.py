@@ -18,7 +18,10 @@ class Car:
 
     def park(self, parking):
         self.enter()
-        while True:
+        attempts = 0
+        max_attempts = 3
+
+        while attempts < max_attempts:
             random.shuffle(parking.list_slots)
             for slot in parking.list_slots:
                 with slot.lock:
@@ -27,13 +30,13 @@ class Car:
                         self.parking_record_id = save_parking_record(self.customer_id, slot.id)
                         return True
 
-            if not self.slot:
-                if random.choice([True, False]):
-                    print(f"No slots currently available, customer {self.customer_id} decides to leave.")
-                    return False
-                print(f"No slots currently available, customer {self.customer_id} is waiting")
+            attempts += 1
+            print(
+                f"No slots available (attempt {attempts}/{max_attempts}), customer {self.customer_id} keeps waiting...")
+            time.sleep(random.randrange(1, 10))
 
-            time.sleep(2)
+        print(f"Customer {self.customer_id} gave up after {max_attempts} attempts.")
+        return False
 
     def de_park(self):
         slot = self.slot
@@ -71,7 +74,7 @@ class ParkingSlot:
 class Parking:
     def __init__(self):
         self.list_cars = []
-        self.list_slots = [ParkingSlot(id) for id in range(20)]
+        self.list_slots = [ParkingSlot(id) for id in range(30)]
 
 
 

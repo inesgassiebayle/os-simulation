@@ -1,13 +1,19 @@
 import threading
 import random
+import time
+import sqlite3
+import os
+
 from game_implementations import RouletteFactory, BlackJackFactory, CrapsFactory, SlotMachineFactory, PokerFactory
-from customer_factory import GamblerFactory, OrderingAddictFactory, StrategistFactory, BudgetPlayerFactory, DrunkenGamblerFactory, AdventurerFactory, MinimalistFactory, RichPlayerFactory, RiskyCheatingFactory, RiskyPlayerFactory, ShopperFactory, SafePlayerFactory, TiredCustomerFactory, VipFactory
+from customer_factory import (
+    GamblerFactory, OrderingAddictFactory, StrategistFactory, BudgetPlayerFactory, DrunkenGamblerFactory,
+    AdventurerFactory, MinimalistFactory, RichPlayerFactory, RiskyCheatingFactory, RiskyPlayerFactory,
+    ShopperFactory, SafePlayerFactory, TiredCustomerFactory, VipFactory
+)
 from bar import create_bars, Barista
 from parking_lot import Parking
 from restaurant import create_restaurants, Waiter
 from hotel import Hotel
-import sqlite3
-import os
 
 class Casino:
     def __init__(self):
@@ -18,6 +24,7 @@ class Casino:
         self.parking = Parking()
         self.restaurants = []
         self.hotel = Hotel(10, casino=self)
+        self.db_path = os.path.join(os.path.dirname(__file__), "casino.db")
 
     def add_game(self, game):
         if game.name not in self.games:
@@ -34,46 +41,59 @@ class Casino:
             self.customers.append(customer)
 
     def open_casino(self):
-        db_path = os.path.join(os.path.dirname(__file__), "casino.db")
-        conn = sqlite3.connect(db_path)
+        conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
         customers = []
-        factories = [GamblerFactory(self), OrderingAddictFactory(self), StrategistFactory(self), BudgetPlayerFactory(self), DrunkenGamblerFactory(self), AdventurerFactory(self), MinimalistFactory(self), RichPlayerFactory(self), RiskyCheatingFactory(self), RiskyPlayerFactory(self), ShopperFactory(self), SafePlayerFactory(self), TiredCustomerFactory(self), VipFactory(self)]
+        factories_with_weights = [
+            (GamblerFactory(self), 20),
+            (DrunkenGamblerFactory(self), 10),
+            (BudgetPlayerFactory(self), 15),
+            (ShopperFactory(self), 10),
+            (StrategistFactory(self), 5),
+            (OrderingAddictFactory(self), 5),
+            (AdventurerFactory(self), 5),
+            (MinimalistFactory(self), 5),
+            (VipFactory(self), 5),
+            (RichPlayerFactory(self), 5),
+            (SafePlayerFactory(self), 5),
+            (RiskyPlayerFactory(self), 3),
+            (RiskyCheatingFactory(self), 1),
+            (TiredCustomerFactory(self), 1),
+        ]
+        total_customers_initial = 80
+        self.total_customers_generated = 0
 
-        # Crear customers
-        for i in range(50):
-            factory = random.choice(factories)
+        factory_choices, weights = zip(*factories_with_weights)
+
+        for i in range(1, total_customers_initial+1):
+            factory = random.choices(factory_choices, weights=weights, k=1)[0]
             customer = factory.create_customer(i)
             customers.append(customer)
             cursor.execute("""
                 INSERT INTO customer (initial_balance, customer_type, has_car)
                 VALUES (?, ?, ?)
             """, (customer.balance, customer.type, 1 if customer.car else 0))
+            self.total_customers_generated += 1
 
-
-        bars = create_bars()
-        bar_id_map = {}
+        bars = create_bars()[:3]
         for bar in bars:
             cursor.execute("""
                 INSERT INTO bar (name) VALUES (?)
             """, (bar.name,))
             bar_id = cursor.lastrowid
-            bar_id_map[bar.name] = bar_id
             for item in bar.menu.products:
                 cursor.execute("""
                     INSERT INTO menu_item (name, price, prep_time, source_type, source_id)
                     VALUES (?, ?, ?, 'bar', ?)
                 """, (item.name, item.price, item.prep_time, bar_id))
 
-        restaurants = create_restaurants(self)
-        restaurant_id_map = {}
+        restaurants = create_restaurants(self)[:2]
         for restaurant in restaurants:
             cursor.execute("""
                 INSERT INTO restaurant (name, num_tables) VALUES (?, ?)
             """, (restaurant.name, restaurant.num_tables))
             restaurant_id = cursor.lastrowid
-            restaurant_id_map[restaurant.name] = restaurant_id
             for item in restaurant.menu.products:
                 cursor.execute("""
                     INSERT INTO menu_item (name, price, prep_time, source_type, source_id)
@@ -82,21 +102,21 @@ class Casino:
 
         n_games = 0
         games = []
-        for _ in range(5):
+        for _ in range(4):
             games.append(RouletteFactory(self).create_game(n_games))
             n_games += 1
-        for _ in range(10):
+        for _ in range(25):
             games.append(SlotMachineFactory(self).create_game(n_games))
             n_games += 1
-        for _ in range(2):
+        for _ in range(6):
             games.append(BlackJackFactory(self).create_game(n_games))
             n_games += 1
-        for _ in range(7):
+        for _ in range(3):
             games.append(CrapsFactory(self).create_game(n_games))
             n_games += 1
-        for _ in range(10):
+        for _ in range(5):
             games.append(PokerFactory(self).create_game(n_games))
-            n_games +=1
+            n_games += 1
 
         for game in games:
             cursor.execute("""
@@ -109,7 +129,7 @@ class Casino:
 
         waiters = []
         for restaurant in restaurants:
-            for i in range(5):
+            for i in range(4):
                 waiters.append(Waiter(i, restaurant))
 
         for restaurant in restaurants:
@@ -117,7 +137,7 @@ class Casino:
 
         baristas = []
         for bar in bars:
-            for i in range(5):
+            for i in range(3):
                 baristas.append(Barista(i, bar))
 
         for bar in bars:
@@ -134,12 +154,36 @@ class Casino:
 
         for game in games:
             self.add_game(game)
-
-        for game in games:
             game.start()
 
         for customer in customers:
             customer.start()
+
+        threading.Thread(target=self.spawn_customers_dynamically, args=(factory_choices, weights)).start()
+
+    def spawn_customers_dynamically(self, factory_choices, weights, delay_range=(5, 15), max_customers=300):
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        while self.total_customers_generated < max_customers:
+            customer_id = self.total_customers_generated + 1
+            factory = random.choices(factory_choices, weights=weights, k=1)[0]
+            customer = factory.create_customer(customer_id)
+            print(f"New Customer-{customer_id} ({customer.type}) arrived at the casino.")
+            self.add_customer(customer)
+            customer.start()
+
+            cursor.execute("""
+                INSERT INTO customer (initial_balance, customer_type, has_car)
+                VALUES (?, ?, ?)
+            """, (customer.balance, customer.type, 1 if customer.car else 0))
+            conn.commit()
+
+            self.total_customers_generated += 1  # move to next id
+            time.sleep(random.randint(*delay_range))
+
+        conn.close()
+
 
 if __name__ == "__main__":
     casino = Casino()
