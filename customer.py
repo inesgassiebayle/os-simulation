@@ -9,21 +9,24 @@ import time
 # Base Customer class inheriting from threading.Thread to simulate concurrent customer behavior
 class Customer(threading.Thread):
     def __init__(self, id, casino, balance, p_leaving, p_strategizing, p_ordering, p_playing, type, p_sleeping, min_bet, max_bet, has_car_probability, p_restaurant, game_preferences):
-        super().__init__()  # Initialize the thread with the parent class
-        self.id = id  # Customer's unique ID
-        self.casino = casino  # The casino where the customer is playing
+        super().__init__() # Initialize the thread with the parent class
+        self.id = id # Customer's unique ID
+        self.casino = casino # The casino where the customer is playing
         self.balance = balance  # The customer's balance
-        self.lock = threading.Lock()  # Lock to synchronize access to the customer's balance
-        self.p_leaving = p_leaving  # Probability of the customer leaving the casino
-        self.p_strategizing = p_strategizing  # Probability of the customer strategizing when playing
-        self.p_ordering = p_ordering  # Probability of the customer ordering food or drinks
-        self.p_playing = p_playing  # Probability of the customer playing a game
+        self.lock = threading.Lock() # Lock to synchronize access to the customer's balance
+        self.p_leaving = p_leaving # Probability of the customer leaving the casino
+        self.p_strategizing = p_strategizing   # Probability of the customer strategizing when playing
+        self.p_ordering = p_ordering   # Probability of the customer ordering food or drinks
+        self.p_playing = p_playing # Probability of the customer playing a game
         self.p_sleeping = p_sleeping  # Probability of the customer sleeping
-        self.min_bet = min_bet  # Minimum bet the customer can make
-        self.max_bet = max_bet  # Maximum bet the customer can make
-        self.car = Car(id) if random.random() < has_car_probability else None  # Randomly assign a car to the customer
-        self.booked_room = None  # The room the customer has booked, if any
+        self.min_bet = min_bet # Minimum bet the customer can make
+        self.max_bet = max_bet # Maximum bet the customer can make
+        self.car = Car(id) if random.random() < has_car_probability else None # Assign a car to the customer
+        self.booked_room = None # The room the customer has booked, if any
         self.permanence_id = None  # ID for the customer's permanence record in the casino
+        self.type = type
+        self.p_restaurant = p_restaurant
+        self.game_preferences = game_preferences
 
     def amount_bet(self):
         # Returns a random amount the customer is willing to bet based on their balance and bet limits
